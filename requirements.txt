@@ -1,0 +1,24 @@
+# 核心依賴
+faster-whisper>=1.0.0
+openai>=1.0.0
+anthropic>=0.18.0
+moviepy>=1.0.3
+librosa>=0.10.0
+soundfile>=0.12.0
+
+# 翻譯服務（免費）
+deep-translator>=1.11.4
+
+# 輔助工具
+numpy>=1.24.0
+scipy>=1.10.0
+tqdm>=4.65.0
+
+# 如果使用 GPU
+# torch>=2.0.0
+# torchaudio>=2.0.0
+
+# FFmpeg (需要額外安裝)
+# Windows: choco install ffmpeg
+# Linux: sudo apt-get install ffmpeg
+# macOS: brew install ffmpeg

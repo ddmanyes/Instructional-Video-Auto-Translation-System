@@ -1,0 +1,139 @@
+"""
+配置文件
+"""
+
+import os
+from pathlib import Path
+
+# 專案根目錄
+PROJECT_ROOT = Path(__file__).parent
+
+# 路徑配置
+VIDEO_DIR = PROJECT_ROOT / "video"
+OUTPUT_DIR = PROJECT_ROOT / "output"
+SUBTITLE_DIR = OUTPUT_DIR / "subtitles"
+AUDIO_DIR = OUTPUT_DIR / "audio"
+FINAL_VIDEO_DIR = OUTPUT_DIR / "final_videos"
+
+# ASR 配置
+ASR_CONFIG = {
+    "model_size": "base",  # tiny, base, small, medium, large-v3 (base 較快且準確)
+    "device": "cpu",  # cpu (不需要 GPU)
+    "compute_type": "int8",  # int8 在 CPU 上更快
+    "language": "zh",  # 原始影片語言
+}
+
+# 中文字幕清理配置（只影響輸出的中文字幕檔）
+CLEANER_CONFIG = {
+    "enabled": True,
+    "suffix": "_zh_clean",
+    "overwrite_original": False,
+    "filler_words": [
+        "嗯",
+        "呃",
+        "啊",
+        "那個",
+        "這個",
+        "就是",
+        "其實",
+        "然後",
+        "你知道",
+        "我覺得",
+    ],
+    "repeat_phrases": [
+        "所以所以",
+        "我們我們",
+        "這個這個",
+        "那個那個",
+        "就是就是",
+    ],
+    "typo_map": {
+        # "內份泌": "內分泌",
+        # "胰島數": "胰島素",
+    },
+}
+
+# Gemini CLI 校稿設定
+GEMINI_CONFIG = {
+    "enabled": False,
+    "command": "pwsh",
+    "command_args": [
+        "-File",
+        r"C:\Users\User\AppData\Roaming\npm\gemini.ps1",
+    ],
+    "model": "",
+    "batch_size": 8,
+    "timeout": 180,
+    "max_length_ratio": 1.0,
+    "suffix": "_zh_gemini",
+    "overwrite_original": False,
+}
+
+# 英文字幕校稿設定（生理/解剖語境）
+EN_PROOFREAD_PROMPT = (
+    "You are an expert medical editor for university-level physiology textbooks.\n"
+    "Refine the following English subtitles for clarity, medical accuracy, and academic tone.\n\n"
+    "Specific Rules:\n"
+    "1. Medical Accuracy: Ensure terms like 'Action Potential', 'Homeostasis', and 'Synaptic Transmission' are used precisely.\n"
+    "2. Subtitle Pacing: Simplify complex sentences to be more readable on screen (conciseness is key).\n"
+    "3. Grammar: Fix any translation artifacts.\n"
+    "4. Preservation: Keep '\\n' for line breaks and ensure the line count remains identical to the input.\n"
+    "5. Format: Output ONLY a valid JSON array of strings."
+)
+
+EN_PROOFREAD_CONFIG = {
+    "enabled": True,
+    "command": "pwsh",
+    "command_args": [
+        "-File",
+        r"C:\Users\User\AppData\Roaming\npm\gemini.ps1",
+    ],
+    "model": "",
+    "batch_size": 8,
+    "timeout": 180,
+    "max_length_ratio": 1.0,
+    "suffix": "_en_proofread",
+    "overwrite_original": False,
+    "only_flagged": False,
+}
+
+# 翻譯配置
+TRANSLATION_CONFIG = {
+    "api_provider": "google",  # google (免費), openai, anthropic
+    "target_language": "en",
+    "batch_size": 20,  # 每批次翻譯的字幕數量 (已優化聚合請求)
+    "domain": "physiology",  # 專業領域：生理醫學
+}
+
+# TTS 配置
+TTS_CONFIG = {
+    # ── Edge TTS 模式（免費，固定音色）──────────────────────────────────
+    "voice": "en-US-GuyNeural",  # Edge TTS 音色
+    # 其他推薦音色：en-US-JennyNeural | en-US-AriaNeural | en-GB-RyanNeural
+    "speed": 1.3,  # 語速 (0.5-2.0)
+
+    # ── XTTS-v2 聲音克隆模式 ─────────────────────────────────────────────
+    # 設為 True 以啟用跨語言聲音克隆（從中文參考音頻生成英文語音）
+    "use_xtts": False,
+    # 參考音頻路徑（可由命令列 --ref-audio 覆蓋）
+    # 使用 scripts/extract_ref_audio.py 從影片中提取
+    "ref_audio_path": "output/ref_audio/110-Gastrointestinal system-I &II-115090_ref.wav",
+}
+
+# 影音合成配置
+VIDEO_ASSEMBLY_CONFIG = {
+    "method": "moviepy",  # moviepy 或 ffmpeg
+    "embed_subtitles": True,  # 是否嵌入硬字幕（需要 FFmpeg）
+    "keep_original_audio": False,  # 是否保留原始音軌（混音）
+}
+
+# API 金鑰（建議使用環境變數）
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+
+# 日誌配置
+LOGGING_CONFIG = {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "datefmt": "%Y-%m-%d %H:%M:%S"
+}

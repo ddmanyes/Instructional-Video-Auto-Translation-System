@@ -1,0 +1,69 @@
+[project]
+name = "physiology-video-translator"
+version = "1.0.0"
+description = "教學影片自動翻譯系統 - 專為生理醫學設計"
+requires-python = ">=3.9"
+authors = [
+    {name = "生理課程助教", email = "assistant@example.com"}
+]
+readme = "README.md"
+license = {file = "LICENSE"}
+keywords = ["video", "translation", "physiology", "medical", "education"]
+
+dependencies = [
+    # 核心依賴
+    "faster-whisper>=1.0.0",
+    "openai>=1.0.0",
+    "anthropic>=0.18.0",
+    "moviepy>=1.0.3",
+    "librosa>=0.10.0",
+    "soundfile>=0.12.0",
+    
+    # 翻譯服務（免費）
+    "deep-translator>=1.11.4",
+    
+    # TTS 語音合成（免費）
+    "edge-tts>=7.0.0",
+    
+    # 輔助工具
+    "numpy>=1.24.0,<2.0.0",
+    "scipy>=1.10.0",
+    "tqdm>=4.65.0",
+    "TTS>=0.22.0",
+    "trainer>=0.0.36",
+    "coqpit>=0.0.17",
+    "transformers>=4.30.0",
+]
+
+[project.optional-dependencies]
+gpu = [
+    "torch>=2.0.0",
+    "torchaudio>=2.0.0",
+]
+
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+]
+
+[project.scripts]
+video-translate = "main:main"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["modules"]
+
+[tool.uv]
+dev-dependencies = []
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310', 'py311']
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
