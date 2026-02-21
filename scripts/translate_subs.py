@@ -15,10 +15,12 @@ def main():
     args = parser.parse_args()
 
     subtitle_dir = config.SUBTITLE_DIR
+    print(f"DEBUG: Initializing SubtitleTranslator with provider: {config.TRANSLATION_CONFIG['api_provider']}...")
     translator = SubtitleTranslator(
         api_provider=config.TRANSLATION_CONFIG["api_provider"],
         api_key=config.OPENAI_API_KEY if config.TRANSLATION_CONFIG["api_provider"] == "openai" else config.ANTHROPIC_API_KEY,
     )
+    print("DEBUG: SubtitleTranslator initialized successfully.")
 
     if args.file:
         # 單獨翻譯一個檔案

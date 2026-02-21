@@ -2,7 +2,7 @@
 name = "physiology-video-translator"
 version = "1.0.0"
 description = "教學影片自動翻譯系統 - 專為生理醫學設計"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 authors = [
     {name = "生理課程助教", email = "assistant@example.com"}
 ]
@@ -57,8 +57,7 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 packages = ["modules"]
 
-[tool.uv]
-dev-dependencies = []
+
 
 [tool.black]
 line-length = 100

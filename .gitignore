@@ -43,9 +43,14 @@ temp_*.mp4
 temp_*.wav
 temp_*.aac
 
-# 輸出檔案（取消忽略例外）
+# 輸出檔案與影音檔案 (不備份)
 output/
 video/
+*.srt
+*.wav
+*.mp4
+*.aac
+*.m4a
 
 # Qwen3-TTS (如果放在專案中)
 Qwen3-TTS/
