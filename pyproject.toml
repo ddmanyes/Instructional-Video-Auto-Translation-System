@@ -32,7 +32,7 @@ dependencies = [
     "TTS>=0.22.0",
     "trainer>=0.0.36",
     "coqpit>=0.0.17",
-    "transformers>=4.30.0",
+    "transformers>=4.30.0,<4.40.0",
 ]
 
 [project.optional-dependencies]
