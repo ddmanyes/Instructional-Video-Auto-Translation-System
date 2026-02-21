@@ -57,14 +57,19 @@
 
 ## 🚀 快速開始
 
-### 方法 A：使用 UV（推薦 - 更快更簡單）
+### 方法 A：使用 UV（推薦 - 穩定且現代）
+
+**系統需求：** Python 3.11+
 
 ```powershell
-# 虛擬環境已建立，直接使用
-.\.venv\Scripts\python.exe main.py --batch
+# 確保環境與依賴對齊
+uv sync
+
+# 批次處理所有影片
+uv run python main.py --batch
 
 # 或使用互動式腳本
-.\run_uv.ps1
+uv run .\run_uv.ps1
 ```
 
 詳見 [UV_GUIDE.md](UV_GUIDE.md) 完整說明。
@@ -318,21 +323,18 @@ python main.py --batch --no-gemini
 
 目前 video 資料夾中有以下影片待處理：
 
-1. 110-Gastrointestinal system-III-115092.mp4
-2. Neurophysiology-3.mp4
-3. Neurophysiology-2.mp4
-4. 110-Gastrointestinal system-I &II-115090.mp4
-5. Neurophysiology-1.mp4
-6. reproduction-2.mp4
-7. Reproduction-1.mp4
-8. Endocrine-2.mp4
-9. Endocrine-1.mp4
-10. Respiratory system II-110034.mp4
-11. Endocrine-3.mp4
-12. Respiratory system II.mp4
-13. 110-Gastrointestinal system-III.mp4
-14. Respiratory system I.mp4
-15. 110-Gastrointestinal system-I &II.mp4
+1. 110-Gastrointestinal system-I &II.mp4
+2. 110-Gastrointestinal system-III.mp4
+3. Endocrine-1.mp4
+4. Endocrine-2.mp4
+5. Endocrine-3.mp4
+6. Neurophysiology-1.mp4
+7. Neurophysiology-2.mp4
+8. Neurophysiology-3.mp4
+9. Reproduction-1.mp4
+10. Respiratory system I.mp4
+11. Respiratory system II.mp4
+12. reproduction-2.mp4
 
 ## 📄 授權
 
