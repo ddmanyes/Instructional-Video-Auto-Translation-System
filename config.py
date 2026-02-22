@@ -25,7 +25,7 @@ ASR_CONFIG = {
 
 # 中文字幕清理配置（只影響輸出的中文字幕檔）
 CLEANER_CONFIG = {
-    "enabled": True,
+    "enabled": False,
     "suffix": "_zh_clean",
     "overwrite_original": False,
     "filler_words": [
@@ -82,7 +82,7 @@ EN_PROOFREAD_PROMPT = (
 )
 
 EN_PROOFREAD_CONFIG = {
-    "enabled": True,
+    "enabled": False,
     "command": "pwsh",
     "command_args": [
         "-File",

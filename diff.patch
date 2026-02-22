@@ -1,0 +1,197 @@
+diff --git a/config.py b/config.py
+index 19f5c22..26cbb01 100644
+--- a/config.py
++++ b/config.py
+@@ -25,7 +25,7 @@ ASR_CONFIG = {
+ 
+ # 中文字幕清理配置（只影響輸出的中文字幕檔）
+ CLEANER_CONFIG = {
+-    "enabled": True,
++    "enabled": False,
+     "suffix": "_zh_clean",
+     "overwrite_original": False,
+     "filler_words": [
+@@ -82,7 +82,7 @@ EN_PROOFREAD_PROMPT = (
+ )
+ 
+ EN_PROOFREAD_CONFIG = {
+-    "enabled": True,
++    "enabled": False,
+     "command": "pwsh",
+     "command_args": [
+         "-File",
+diff --git a/main.py b/main.py
+index 259b963..dc2fba2 100644
+--- a/main.py
++++ b/main.py
+@@ -154,10 +154,18 @@ class VideoTranslationPipeline:
+                 return str(proofread_srt_path or cleaned_srt_path or zh_srt_path)
+             
+             # 步驟 2: 翻譯 (斷點續傳)
+-            if en_srt_path.exists():
++            # 檢查是否已存在各種可能的英文字幕檔名 (標準、手動校正後產生的)
++            potential_en_paths = [
++                en_srt_path,
++                config.SUBTITLE_DIR / f"{video_name}_corrected_en.srt",
++                config.SUBTITLE_DIR / f"{video_name}_zh_corrected_en.srt"
++            ]
++            existing_en = next((p for p in potential_en_paths if p.exists()), None)
++
++            if existing_en:
+                 logger.info("【步驟 2/4】翻譯字幕...")
+-                logger.info(f"⏭️  跳過：英文字幕已存在 {en_srt_path}\n")
+-                en_srt_path = str(en_srt_path)
++                logger.info(f"⏭️  跳過：英文字幕已存在 {existing_en.name}\n")
++                en_srt_path = str(existing_en)
+             else:
+                 logger.info("【步驟 2/4】翻譯字幕...")
+                 en_srt_path = self.translator.translate_subtitles(
+@@ -235,18 +243,24 @@ class VideoTranslationPipeline:
+                 "-map", "1:a:0",
+                 output_video
+             ]
+-            subprocess.run(cmd_merge, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+             
+-            # 清理暫存檔與無數的小段音頻片段 (針對當下影片產出的已知檔案刪除，避免多線程競爭刪光其餘影片檔案)
+-            logger.info("🧹 清理中間生成的音頻暫存檔...")
+-            for seg in audio_segments:
+-                path = seg.get('audio_path')
+-                if path and os.path.exists(path):
+-                    try:
+-                        os.remove(path)
+-                    except Exception: 
+-                        pass
+-            shutil.rmtree(aligned_dir, ignore_errors=True)
++            result = subprocess.run(cmd_merge, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
++            if result.returncode != 0:
++                logger.error(f"❌ FFmpeg 合併失敗: {result.stderr.decode('utf-8', errors='ignore')}")
++                logger.info("❌ 合成失敗，保留中間音訊檔與暫存以供後續重試及除錯...")
++            else:
++                logger.info(f"✓ 影片合成完成: {output_video}")
++                # 清理暫存檔與無數的小段音頻片段
++                logger.info("🧹 清理中間生成的音頻暫存檔...")
++                for seg in audio_segments:
++                    path = seg.get('audio_path')
++                    if path and os.path.exists(path):
++                        try:
++                            # 為了保險起見，可以暫不刪除，或這裡的除外
++                            os.remove(path)
++                        except Exception: 
++                            pass
++                shutil.rmtree(aligned_dir, ignore_errors=True)
+             
+             logger.info(f"✓ 影片處理完成: {output_video}\n")
+             
+@@ -260,13 +274,14 @@ class VideoTranslationPipeline:
+             logger.error(f"❌ 處理失敗: {e}")
+             raise
+     
+-    def process_batch(self, video_dir=None, pattern="*.mp4", subtitle_only=False):
++    def process_batch(self, video_dir=None, pattern="*.mp4", ref_audio=None, subtitle_only=False):
+         """
+         批次處理多個影片
+         
+         Args:
+             video_dir: 影片目錄（預設使用 config 中的設定）
+             pattern: 檔案匹配模式
++            ref_audio: 參考音頻路徑（用於聲音克隆，可選）
+             subtitle_only: 只生成字幕（跳過TTS和視頻合成）
+         """
+         video_dir = Path(video_dir or config.VIDEO_DIR)
+@@ -286,7 +301,7 @@ class VideoTranslationPipeline:
+         for i, video_path in enumerate(video_files, 1):
+             logger.info(f"\n進度: [{i}/{len(video_files)}]")
+             try:
+-                output = self.process_single_video(str(video_path), subtitle_only=subtitle_only)
++                output = self.process_single_video(str(video_path), ref_audio=ref_audio, subtitle_only=subtitle_only)
+                 results.append({"video": video_path.name, "status": "成功", "output": output})
+             except Exception as e:
+                 results.append({"video": video_path.name, "status": "失敗", "error": str(e)})
+@@ -310,6 +325,7 @@ def main():
+     parser.add_argument("--dir", "-d", type=str, help="影片目錄（批次模式）")
+     parser.add_argument("--ref-audio", "-r", type=str, help="參考音頻路徑（用於聲音克隆）")
+     parser.add_argument("--subtitle-only", "-so", action="store_true", help="只輸出中文字幕（跳過TTS和視頻合成）")
++    parser.add_argument("--xtts", action="store_true", help="啟用 XTTS-v2 跨語言聲音克隆")
+     gemini_group = parser.add_mutually_exclusive_group()
+     gemini_group.add_argument("--gemini", action="store_true", help="啟用 Gemini 校稿")
+     gemini_group.add_argument("--no-gemini", action="store_true", help="停用 Gemini 校稿")
+@@ -321,6 +337,9 @@ def main():
+     elif args.no_gemini:
+         config.GEMINI_CONFIG["enabled"] = False
+     
++    if args.xtts:
++        config.TTS_CONFIG["use_xtts"] = True
++    
+     # 創建輸出目錄
+     for dir_path in [config.SUBTITLE_DIR, config.AUDIO_DIR, config.FINAL_VIDEO_DIR]:
+         dir_path.mkdir(parents=True, exist_ok=True)
+@@ -334,11 +353,11 @@ def main():
+         pipeline.process_single_video(args.video, ref_audio=args.ref_audio, subtitle_only=args.subtitle_only)
+     elif args.batch:
+         # 批次處理
+-        pipeline.process_batch(video_dir=args.dir, subtitle_only=args.subtitle_only)
++        pipeline.process_batch(video_dir=args.dir, ref_audio=args.ref_audio, subtitle_only=args.subtitle_only)
+     else:
+         # 預設：處理 video 資料夾中的所有影片
+         logger.info("未指定參數，將處理 video 資料夾中的所有影片")
+-        pipeline.process_batch(subtitle_only=args.subtitle_only)
++        pipeline.process_batch(ref_audio=args.ref_audio, subtitle_only=args.subtitle_only)
+ 
+ 
+ if __name__ == "__main__":
+diff --git a/modules/tts.py b/modules/tts.py
+index e145fff..f9ce9ea 100644
+--- a/modules/tts.py
++++ b/modules/tts.py
+@@ -219,7 +219,8 @@ class TTSProcessor:
+         for i, sub in enumerate(subtitles):
+             audio_file = os.path.join(output_dir, f"{video_name}_seg_{sub['index']:04d}.wav")
+ 
+-            if skip_existing and os.path.exists(audio_file):
++            # 檢查檔案是否存在且大小不為 0（防止斷電或中斷產生的損毀檔）
++            if skip_existing and os.path.exists(audio_file) and os.path.getsize(audio_file) > 0:
+                 skipped_count += 1
+                 actual_duration = librosa.get_duration(path=audio_file)
+                 audio_segments.append({
+@@ -229,12 +230,22 @@ class TTSProcessor:
+                 })
+                 continue
+ 
+-            success = self._generate_single_audio(
+-                text=sub['text'],
+-                output_path=audio_file,
+-                target_duration=sub['duration'],
+-                ref_audio=ref_audio
+-            )
++            import time
++            import random
++            max_retries = 5
++            success = False
++            for attempt in range(max_retries):
++                success = self._generate_single_audio(
++                    text=sub['text'],
++                    output_path=audio_file,
++                    target_duration=sub['duration'],
++                    ref_audio=ref_audio
++                )
++                if success:
++                    break
++                wait_time = (2 ** attempt) + random.uniform(0.5, 2.0)
++                logger.warning(f"⚠️ 生成失敗，等待 {wait_time:.1f} 秒後重試... ({attempt+1}/{max_retries})")
++                time.sleep(wait_time)
+ 
+             if success:
+                 actual_duration = librosa.get_duration(path=audio_file)
+@@ -248,7 +259,11 @@ class TTSProcessor:
+                     f"目標: {sub['duration']:.2f}s | 實際: {actual_duration:.2f}s"
+                 )
+             else:
+-                logger.warning(f"生成失敗跳過: {sub['text'][:30]}...")
++                logger.error(f"❌ 嚴重錯誤：連續 {max_retries} 次生成失敗，為避免無聲影片已中止: {sub['text'][:30]}...")
++                raise RuntimeError("語音生成持續失敗（API 限制或網路錯誤），請切換 IP 或稍後再試！")
++            
++            # 加入較保守的隨機延遲避免 API 被限流 (2000+ 句需要更穩健)
++            time.sleep(random.uniform(0.3, 0.8))
+ 
+         if skipped_count > 0:
+             logger.info(f"⏭️  跳過已存在: {skipped_count} 個片段")

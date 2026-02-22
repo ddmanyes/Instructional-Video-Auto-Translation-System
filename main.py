@@ -154,10 +154,18 @@ class VideoTranslationPipeline:
                 return str(proofread_srt_path or cleaned_srt_path or zh_srt_path)
             
             # 步驟 2: 翻譯 (斷點續傳)
-            if en_srt_path.exists():
+            # 檢查是否已存在各種可能的英文字幕檔名 (標準、手動校正後產生的)
+            potential_en_paths = [
+                en_srt_path,
+                config.SUBTITLE_DIR / f"{video_name}_corrected_en.srt",
+                config.SUBTITLE_DIR / f"{video_name}_zh_corrected_en.srt"
+            ]
+            existing_en = next((p for p in potential_en_paths if p.exists()), None)
+
+            if existing_en:
                 logger.info("【步驟 2/4】翻譯字幕...")
-                logger.info(f"⏭️  跳過：英文字幕已存在 {en_srt_path}\n")
-                en_srt_path = str(en_srt_path)
+                logger.info(f"⏭️  跳過：英文字幕已存在 {existing_en.name}\n")
+                en_srt_path = str(existing_en)
             else:
                 logger.info("【步驟 2/4】翻譯字幕...")
                 en_srt_path = self.translator.translate_subtitles(
@@ -235,18 +243,24 @@ class VideoTranslationPipeline:
                 "-map", "1:a:0",
                 output_video
             ]
-            subprocess.run(cmd_merge, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             
-            # 清理暫存檔與無數的小段音頻片段 (針對當下影片產出的已知檔案刪除，避免多線程競爭刪光其餘影片檔案)
-            logger.info("🧹 清理中間生成的音頻暫存檔...")
-            for seg in audio_segments:
-                path = seg.get('audio_path')
-                if path and os.path.exists(path):
-                    try:
-                        os.remove(path)
-                    except Exception: 
-                        pass
-            shutil.rmtree(aligned_dir, ignore_errors=True)
+            result = subprocess.run(cmd_merge, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if result.returncode != 0:
+                logger.error(f"❌ FFmpeg 合併失敗: {result.stderr.decode('utf-8', errors='ignore')}")
+                logger.info("❌ 合成失敗，保留中間音訊檔與暫存以供後續重試及除錯...")
+            else:
+                logger.info(f"✓ 影片合成完成: {output_video}")
+                # 清理暫存檔與無數的小段音頻片段
+                logger.info("🧹 清理中間生成的音頻暫存檔...")
+                for seg in audio_segments:
+                    path = seg.get('audio_path')
+                    if path and os.path.exists(path):
+                        try:
+                            # 為了保險起見，可以暫不刪除，或這裡的除外
+                            os.remove(path)
+                        except Exception: 
+                            pass
+                shutil.rmtree(aligned_dir, ignore_errors=True)
             
             logger.info(f"✓ 影片處理完成: {output_video}\n")
             
@@ -260,13 +274,14 @@ class VideoTranslationPipeline:
             logger.error(f"❌ 處理失敗: {e}")
             raise
     
-    def process_batch(self, video_dir=None, pattern="*.mp4", subtitle_only=False):
+    def process_batch(self, video_dir=None, pattern="*.mp4", ref_audio=None, subtitle_only=False):
         """
         批次處理多個影片
         
         Args:
             video_dir: 影片目錄（預設使用 config 中的設定）
             pattern: 檔案匹配模式
+            ref_audio: 參考音頻路徑（用於聲音克隆，可選）
             subtitle_only: 只生成字幕（跳過TTS和視頻合成）
         """
         video_dir = Path(video_dir or config.VIDEO_DIR)
@@ -286,7 +301,7 @@ class VideoTranslationPipeline:
         for i, video_path in enumerate(video_files, 1):
             logger.info(f"\n進度: [{i}/{len(video_files)}]")
             try:
-                output = self.process_single_video(str(video_path), subtitle_only=subtitle_only)
+                output = self.process_single_video(str(video_path), ref_audio=ref_audio, subtitle_only=subtitle_only)
                 results.append({"video": video_path.name, "status": "成功", "output": output})
             except Exception as e:
                 results.append({"video": video_path.name, "status": "失敗", "error": str(e)})
@@ -310,6 +325,7 @@ def main():
     parser.add_argument("--dir", "-d", type=str, help="影片目錄（批次模式）")
     parser.add_argument("--ref-audio", "-r", type=str, help="參考音頻路徑（用於聲音克隆）")
     parser.add_argument("--subtitle-only", "-so", action="store_true", help="只輸出中文字幕（跳過TTS和視頻合成）")
+    parser.add_argument("--xtts", action="store_true", help="啟用 XTTS-v2 跨語言聲音克隆")
     gemini_group = parser.add_mutually_exclusive_group()
     gemini_group.add_argument("--gemini", action="store_true", help="啟用 Gemini 校稿")
     gemini_group.add_argument("--no-gemini", action="store_true", help="停用 Gemini 校稿")
@@ -320,6 +336,9 @@ def main():
         config.GEMINI_CONFIG["enabled"] = True
     elif args.no_gemini:
         config.GEMINI_CONFIG["enabled"] = False
+    
+    if args.xtts:
+        config.TTS_CONFIG["use_xtts"] = True
     
     # 創建輸出目錄
     for dir_path in [config.SUBTITLE_DIR, config.AUDIO_DIR, config.FINAL_VIDEO_DIR]:
@@ -334,11 +353,11 @@ def main():
         pipeline.process_single_video(args.video, ref_audio=args.ref_audio, subtitle_only=args.subtitle_only)
     elif args.batch:
         # 批次處理
-        pipeline.process_batch(video_dir=args.dir, subtitle_only=args.subtitle_only)
+        pipeline.process_batch(video_dir=args.dir, ref_audio=args.ref_audio, subtitle_only=args.subtitle_only)
     else:
         # 預設：處理 video 資料夾中的所有影片
         logger.info("未指定參數，將處理 video 資料夾中的所有影片")
-        pipeline.process_batch(subtitle_only=args.subtitle_only)
+        pipeline.process_batch(ref_audio=args.ref_audio, subtitle_only=args.subtitle_only)
 
 
 if __name__ == "__main__":

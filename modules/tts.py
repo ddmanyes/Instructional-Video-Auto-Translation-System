@@ -219,7 +219,8 @@ class TTSProcessor:
         for i, sub in enumerate(subtitles):
             audio_file = os.path.join(output_dir, f"{video_name}_seg_{sub['index']:04d}.wav")
 
-            if skip_existing and os.path.exists(audio_file):
+            # 檢查檔案是否存在且大小不為 0（防止斷電或中斷產生的損毀檔）
+            if skip_existing and os.path.exists(audio_file) and os.path.getsize(audio_file) > 0:
                 skipped_count += 1
                 actual_duration = librosa.get_duration(path=audio_file)
                 audio_segments.append({
@@ -229,12 +230,22 @@ class TTSProcessor:
                 })
                 continue
 
-            success = self._generate_single_audio(
-                text=sub['text'],
-                output_path=audio_file,
-                target_duration=sub['duration'],
-                ref_audio=ref_audio
-            )
+            import time
+            import random
+            max_retries = 5
+            success = False
+            for attempt in range(max_retries):
+                success = self._generate_single_audio(
+                    text=sub['text'],
+                    output_path=audio_file,
+                    target_duration=sub['duration'],
+                    ref_audio=ref_audio
+                )
+                if success:
+                    break
+                wait_time = (2 ** attempt) + random.uniform(0.5, 2.0)
+                logger.warning(f"⚠️ 生成失敗，等待 {wait_time:.1f} 秒後重試... ({attempt+1}/{max_retries})")
+                time.sleep(wait_time)
 
             if success:
                 actual_duration = librosa.get_duration(path=audio_file)
@@ -248,7 +259,11 @@ class TTSProcessor:
                     f"目標: {sub['duration']:.2f}s | 實際: {actual_duration:.2f}s"
                 )
             else:
-                logger.warning(f"生成失敗跳過: {sub['text'][:30]}...")
+                logger.error(f"❌ 嚴重錯誤：連續 {max_retries} 次生成失敗，為避免無聲影片已中止: {sub['text'][:30]}...")
+                raise RuntimeError("語音生成持續失敗（API 限制或網路錯誤），請切換 IP 或稍後再試！")
+            
+            # 加入較保守的隨機延遲避免 API 被限流 (2000+ 句需要更穩健)
+            time.sleep(random.uniform(0.3, 0.8))
 
         if skipped_count > 0:
             logger.info(f"⏭️  跳過已存在: {skipped_count} 個片段")
