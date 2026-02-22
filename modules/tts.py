@@ -129,6 +129,15 @@ class TTSProcessor:
             bool: 是否成功
         """
         try:
+            if not text.strip():
+                # 遇到空白字幕（如精修後被刪除的贅詞片段），直接生成靜音片段
+                logger.info(f"⏭️  字幕為空，生成靜音片段 ({target_duration or 0.5:.2f}s)")
+                duration = target_duration if target_duration and target_duration > 0 else 0.5
+                sr = 24000  # XTTS/Edge 預設採樣率
+                silent_wav = np.zeros(int(duration * sr))
+                sf.write(output_path, silent_wav, sr)
+                return True
+
             if self.use_xtts:
                 # XTTS-v2 跨語言聲音克隆
                 if not ref_audio:
