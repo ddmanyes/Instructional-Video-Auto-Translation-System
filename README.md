@@ -344,22 +344,7 @@ python main.py --batch --gemini
 python main.py --batch --no-gemini
 ```
 
-## 📝 已處理影片列表
 
-目前 video 資料夾中有以下影片待處理：
-
-1. 110-Gastrointestinal system-I &II.mp4
-2. 110-Gastrointestinal system-III.mp4
-3. Endocrine-1.mp4
-4. Endocrine-2.mp4
-5. Endocrine-3.mp4
-6. Neurophysiology-1.mp4
-7. Neurophysiology-2.mp4
-8. Neurophysiology-3.mp4
-9. Reproduction-1.mp4
-10. Respiratory system I.mp4
-11. Respiratory system II.mp4
-12. reproduction-2.mp4
 
 ## 📄 授權
 
