@@ -251,7 +251,8 @@ class VideoTranslationPipeline:
                 srt_path=en_srt_path,
                 output_dir=str(config.AUDIO_DIR),
                 ref_audio=ref_audio or config.TTS_CONFIG.get("ref_audio_path"),
-                skip_existing=True  # 跳過已存在的音頻
+                skip_existing=True,  # 跳過已存在的音頻
+                video_name=video_name
             )
             logger.info(f"✓ 已生成 {len(audio_segments)} 個音頻片段\n")
             

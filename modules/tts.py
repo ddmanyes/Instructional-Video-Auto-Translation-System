@@ -202,7 +202,8 @@ class TTSProcessor:
         return recalculated
 
     def generate_audio_from_srt(self, srt_path: str, output_dir: str = "output/audio",
-                                 ref_audio: str = None, skip_existing: bool = True):
+                                 ref_audio: str = None, skip_existing: bool = True,
+                                 video_name: str = None):
         """
         根據 SRT 字幕批次生成對應音頻
 
@@ -211,11 +212,13 @@ class TTSProcessor:
             output_dir: 音頻輸出目錄
             ref_audio: 參考音頻（XTTS 模式下為說話者音頻）
             skip_existing: 跳過已存在的音頻
+            video_name: 影片名稱（用於命名音頻碎片）
 
         Returns:
             audio_segments: 包含音頻路徑和時間資訊的列表
         """
-        video_name = Path(srt_path).stem.replace('_en', '').replace('_corrected', '')
+        if not video_name:
+            video_name = Path(srt_path).stem.replace('_en', '').replace('_corrected', '')
         os.makedirs(output_dir, exist_ok=True)
 
         mode = "XTTS-v2 (聲音克隆)" if self.use_xtts else "Edge TTS"
