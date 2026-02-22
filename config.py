@@ -97,6 +97,32 @@ EN_PROOFREAD_CONFIG = {
     "only_flagged": False,
 }
 
+# 英文字幕三段式精修設定（規則清理 → AI 潤色 → 短句合併）
+# 執行時機：翻譯完成後、TTS 語音生成前
+# 啟用方式：設 enabled=True，或執行時加 --refine 旗標
+EN_REFINE_CONFIG = {
+    "enabled": False,           # 是否啟用（可由 --refine / --no-refine 覆蓋）
+    "suffix": "_refined",       # 輸出檔案後綴
+    "overwrite_original": False,# True = 直接覆蓋輸入檔（不建議）
+
+    # ── AI 潤色選項 ───────────────────────────────────────────────
+    "ai_enabled": False,         # False = 只做規則清理+合併，不呼叫 AI
+    "ai_all": False,            # True = AI 處理所有行；False = 只修中文殘留行
+    "command": "pwsh",
+    "command_args": [
+        "-File",
+        r"C:\Users\User\AppData\Roaming\npm\gemini.ps1",
+    ],
+    "model": "",                # 留空使用 Gemini CLI 預設模型
+    "batch_size": 8,            # AI 每批次處理條數
+    "timeout": 180,             # 每批次超時秒數
+
+    # ── 短句合併選項 ───────────────────────────────────────────────
+    "merge_gap_ms": 300,        # 相鄰字幕間隔容忍度（毫秒）
+    "merge_min_words": 7,       # 合併目標最低字數
+    "merge_max_words": 18,      # 合併後字數上限
+}
+
 # 翻譯配置
 TRANSLATION_CONFIG = {
     "api_provider": "google",  # google (免費), openai, anthropic

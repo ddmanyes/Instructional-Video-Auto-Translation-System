@@ -11,10 +11,11 @@
 
 1. **語音轉文字 (ASR)** - 使用 Faster-Whisper 提取中文字幕
 2. **智能翻譯** - 預設使用 Google Translate（免費）+ **生理醫學術語優化**
-3. **語音生成與克隆** - 支援 Edge TTS (預設版) 與 **Coqui XTTS-v2** 聲音克隆 (保留原講者特色)
-4. **精確對齊與合成** - 使用 `align_audio.py` 自動計算時長以 `FFmpeg` 無損伸縮，徹底解決影音不同步
-5. **GPU 加速與版本鎖定** - 深度整合 **NVIDIA RTX 4090 (CUDA 12.1)**，速度提升 5 倍；手動鎖定 `transformers` 與 `torch` 版本以確保系統極度穩定
-6. **模組化腳本管道** - 可單獨呼叫翻譯、提取參考音訊、TTS生成、音軌對齊等流程
+3. **🆕 英文字幕三段式精修** - 翻譯後自動去贅詞、AI 潤色殘留中文、合併碎片短句（`--refine`）
+4. **語音生成與克隆** - 支援 Edge TTS (預設版) 與 **Coqui XTTS-v2** 聲音克隆 (保留原講者特色)
+5. **精確對齊與合成** - 使用 `align_audio.py` 自動計算時長以 `FFmpeg` 無損伸縮，徹底解決影音不同步
+6. **GPU 加速與版本鎖定** - 深度整合 **NVIDIA RTX 4090 (CUDA 12.1)**，速度提升 5 倍；手動鎖定 `transformers` 與 `torch` 版本以確保系統極度穩定
+7. **模組化腳本管道** - 可單獨呼叫翻譯、提取參考音訊、TTS生成、音軌對齊、字幕精修等流程
 
 ## 🎓 專為生理醫學設計
 
@@ -32,12 +33,14 @@ graph TD
     D -- 否 --> F[AI 翻譯器]
     E --> F
     F --> G[英文字幕 .srt]
-    G --> H[Coqui XTTS-v2 / Edge TTS]
+    G --> G2[🆕 三段式精修\n去贅詞+AI潤色+短句合併]
+    G2 --> H[Coqui XTTS-v2 / Edge TTS]
     H --> I[碎片音檔 .wav]
     I --> J[Audio Aligner / Time-Stretch]
     J --> K[FFmpeg 合併]
     K --> L[最終翻譯影片]
 ```
+
 
 ## 💰 成本說明
 
@@ -71,6 +74,12 @@ graph TD
 │   ├── translator.py       # 翻譯模組
 │   ├── tts.py              # 語音合成模組
 │   └── video_assembler.py  # 影音合成模組
+├── scripts/                  # 模組化工具腳本
+│   ├── translate_subs.py   # 獨立字幕翻譯工具
+│   ├── extract_ref_audio.py# 參考音頻提取工具
+│   ├── generate_tts.py     # TTS 語音生成工具
+│   ├── align_audio.py      # 音頻對齊與合成工具
+│   └── refine_en_srt.py    # 🆕 英文字幕三段式精修工具
 ├── config.py                # 配置檔案
 ├── main.py                  # 主程式
 ├── requirements.txt         # Python 依賴
@@ -141,68 +150,91 @@ uv pip install "TTS>=0.22.0"
 
 ### 4. 運行程式 - 一鍵全自動模式 (推薦)
 
-最新版 `main.py` 已經整合了自動化音軌拉伸對齊 (`align_audio`) 與**垃圾清除功能**。它可以無腦地一鍵跑完影片解碼、ASR、翻譯、對齊、合成。
+最新版 `main.py` 已整合音軌拉伸對齊、字幕精修與**垃圾清除功能**，可一鍵跑完影片解碼、ASR、翻譯、精修、對齊、合成。
 
-#### 處理單個影片
+#### 處理單個影片（EdgeTTS 預設音色）
 ```powershell
 uv run python main.py --video "video/Neurophysiology-1.mp4"
 ```
 
-#### 使用聲音克隆 (直接全自動跑完 XTTS 到影片產出)
+#### 使用聲音克隆（XTTS）
 ```powershell
-uv run python main.py --video "video/Neurophysiology-1.mp4" --ref-audio "reference_voice.wav"
+# 先提取參考音頻
+uv run python scripts/extract_ref_audio.py --video "video/Respiratory system I.mp4" --start 30 --duration 15
+
+# 完整流程：XTTS 聲音克隆 + 字幕精修
+uv run python main.py --video "video/Respiratory system I.mp4" \
+    --xtts --ref-audio "output\ref_audio\110-Gastrointestinal system-I &II-115090_ref.wav" \
+    --refine
 ```
 
 #### 批次處理所有資料夾影片
 ```powershell
-uv run python main.py --batch
+uv run python main.py --batch --refine
 ```
 
 #### 手動校正字幕結合兩階段全自動處理 (極端推薦)
 
 若你非常在意翻譯成效並希望先行手動優化生成的中文稿：
 1. **第一階段 (僅提取原始字幕)**：
-   利用 `--subtitle-only` 參數只提取第一手的 ASR `_zh.srt`（處理極快）：
    ```powershell
    uv run python main.py --video "video/Neurophysiology-1.mp4" --subtitle-only
    ```
 2. **手動編輯**：打開字幕檔修正語句與錯字後，儲存成 `_zh_corrected.srt`。
-3. **第二階段 (續傳全自動流程)**：
-   再次下達同樣的一鍵指令（例如加入 XTTS），程式將**自動辨識與採納修改後的檔案**，接續並自動化無痛完成翻譯、TTS、對齊與結合。
+3. **第二階段 (續傳全自動流程 + 精修 + XTTS)**：
    ```powershell
-   uv run python main.py --video "video/Neurophysiology-1.mp4" --ref-audio "reference.wav"
+   uv run python main.py --video "video/Neurophysiology-1.mp4" \
+       --xtts --ref-audio "reference.wav" --refine
    ```
 
 ### 5. 模組化進階腳本執行 (可單獨呼叫)
 
-如果不幸執行中斷或只想更新配音，你可以分拆多個模組化腳本分階段執行：
+如果執行中斷或只想單獨更新特定步驟：
 
 #### A. 翻譯中文字幕
 ```powershell
 uv run python scripts/translate_subs.py
 ```
 
-#### B. 提取參考音訊 (只有使用 XTTS 時才需要)
-擷取片花中的一小段作為克隆依據。
+#### B. 🆕 英文字幕三段式精修（去贅詞 + AI 潤色 + 短句合併）
 ```powershell
-uv run python scripts/extract_ref_audio.py --video "video/Neurophysiology-1.mp4"
+# 完整三段式（規則清理 + AI 修正殘留中文 + 合併短句）
+uv run python scripts/refine_en_srt.py \
+    --file "output/subtitles/Neurophysiology-1_en.srt"
+
+# 僅規則清理 + 合併（最快，不呼叫 AI）
+uv run python scripts/refine_en_srt.py \
+    --file "output/subtitles/Neurophysiology-1_en.srt" --no-ai
+
+# 自訂合併參數
+uv run python scripts/refine_en_srt.py \
+    --file "output/subtitles/Neurophysiology-1_en.srt" \
+    --gap 500 --min-words 5 --max-words 20
 ```
 
-#### C. 生成 AI 語音 (支援 EdgeTTS 與 XTTS)
+#### C. 提取參考音訊 (只有使用 XTTS 時才需要)
+擷取片花中的一小段作為克隆依據：
+```powershell
+uv run python scripts/extract_ref_audio.py \
+    --video "video/Neurophysiology-1.mp4" --start 30 --duration 15
+```
+
+#### D. 生成 AI 語音 (支援 EdgeTTS 與 XTTS)
 ```powershell
 # 預設 Edge TTS：
-uv run python scripts/generate_tts.py --srt "output/subtitles/Neurophysiology-1_en.srt"
+uv run python scripts/generate_tts.py \
+    --srt "output/subtitles/Neurophysiology-1_en.srt"
 
-# 如果你啟用 XTTS 聲音克隆：
-uv run python scripts/generate_tts.py --srt "output/subtitles/Neurophysiology-1_en.srt" --xtts --ref "output/ref_audio/Neurophysiology-1_ref.wav"
+# XTTS 聲音克隆（搭配精修後字幕效果最佳）：
+uv run python scripts/generate_tts.py \
+    --srt "output/subtitles/Neurophysiology-1_en_refined.srt" \
+    --xtts --ref "output/ref_audio/Neurophysiology-1_ref.wav"
 ```
 
-#### D. 影音精準對齊與後製合成
-自動套用 FFmpeg 的 `atempo` 並且填補靜音（無損 Time Stretch 伸縮時間長度），完美對上口型與投影片進度：
+#### E. 影音精準對齊與後製合成
 ```powershell
 uv run python scripts/align_audio.py
 ```
-*(執行完後，你可以用 FFmpeg 把合併好的音軌與原影像結合，`align_audio.py` 中也有提示對應指令)*
 
 -------
 
@@ -236,6 +268,27 @@ TRANSLATION_CONFIG = {
 TTS_CONFIG = {
     "voice": "en-US-GuyNeural",  # Edge TTS 音色
     "speed": 1.3,                # 語速
+    "use_xtts": False,           # True = 啟用 XTTS 聲音克隆
+    "ref_audio_path": "",        # XTTS 參考音頻路徑
+}
+```
+
+### 🆕 英文字幕三段式精修配置
+
+```python
+EN_REFINE_CONFIG = {
+    "enabled": False,           # True = 啟用（或執行時加 --refine）
+
+    # AI 潤色選項
+    "ai_enabled": True,         # False = 只做規則清理+合併
+    "ai_all": False,            # True = AI 處理所有行
+    "batch_size": 8,
+    "timeout": 180,
+
+    # 短句合併選項
+    "merge_gap_ms": 300,        # 相鄰字幕間隔容忍度（毫秒）
+    "merge_min_words": 7,       # 合併目標最低字數
+    "merge_max_words": 18,      # 合併後字數上限
 }
 ```
 
@@ -246,7 +299,7 @@ CLEANER_CONFIG = {
     "enabled": True,
     "suffix": "_zh_clean",
     "overwrite_original": False,
-    "filler_words": ["嗯", "呃", "啊", "那個", "這個", "就是"],
+    "filler_words": ["嗯", "呆", "啊", "那個", "這個", "就是"],
     "repeat_phrases": ["所以所以", "我們我們"],
     "typo_map": {},
 }
@@ -270,7 +323,7 @@ GEMINI_CONFIG = {
     ↓
 output/subtitles/*_zh.srt
     ↓
-[可選] 規則清理/校稿 - 清理贅詞與錯字
+[可選] 規則清理/Gemini 校稿 - 清理贅詞與錯字
     ↓
 output/subtitles/*_zh_clean.srt / *_zh_gemini.srt
     ↓
@@ -278,7 +331,14 @@ output/subtitles/*_zh_clean.srt / *_zh_gemini.srt
     ↓
 output/subtitles/*_en.srt
     ↓
-[步驟 3] TTS - 生成英文語音
+[步驟 2.5] 🆕 英文字幕三段式精修（--refine）
+  ├─ 規則清理：移除句首贅詞 (Then/Just/So...)
+  ├─ AI 潤色：翻譯殘留中文、修飾奇怪語句
+  └─ 合併短句：4676條 → ~1295條（壓縮 3.6倍）
+    ↓
+output/subtitles/*_en_refined.srt
+    ↓
+[步驟 3] TTS - 生成英文語音（Edge TTS 或 XTTS 聲音克隆）
     ↓
 output/audio/*_seg_*.wav
     ↓
@@ -290,16 +350,35 @@ output/final_videos/*_EN.mp4 (最終成品)
 
 ## 🎯 進階功能
 
+### 🆕 英文字幕三段式精修
+
+针對 AI 翻譯常見的「贅詞過多、斷句奇怪、中英混雜」問題，提供三段式自動精修工具：
+
+```powershell
+# 獲對一個英文 SRT 進行完整精修
+uv run python scripts/refine_en_srt.py \
+    --file "output/subtitles/xxx_en.srt"
+```
+
+| 階段 | 功能 | 效果 |
+|------|------|------|
+| 規則清理 | 移除 Then/Just/So 等句首贅詞 | ~50% 字幕改善 |
+| AI 潤色 | 翻譯殘留中文、修飾奇怪語句 | 针對残留中文行 |
+| 合併短句 | 整合磁片字幕成完整句子 | 4676條 → ~1295條 |
+
 ### 聲音克隆 (Voice Cloning, Coqui XTTS-v2)
 
 可從原始影片中獨立提取音頻，作為參考模型：
 
 ```powershell
-uv run python scripts/extract_ref_audio.py --video "video/Neurophysiology-1.mp4" --start 30 --duration 15
+uv run python scripts/extract_ref_audio.py \
+    --video "video/Neurophysiology-1.mp4" --start 30 --duration 15
 ```
-然後利用 `--xtts` 與 `--ref` 選項輸入給 TTS 生成器：
+然後晁用 `--xtts` 與 `--ref` 選項輸入給 TTS 生成器（搭配精修後字幕效果最佳）：
 ```powershell
-uv run python scripts/generate_tts.py --srt "output/subtitles/xxx_en.srt" --xtts --ref "output/ref_audio/xxx_ref.wav"
+uv run python scripts/generate_tts.py \
+    --srt "output/subtitles/xxx_en_refined.srt" \
+    --xtts --ref "output/ref_audio/xxx_ref.wav"
 ```
 
 ### 自訂翻譯提示詞

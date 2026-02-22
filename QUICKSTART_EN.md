@@ -16,43 +16,23 @@ This system is specifically optimized for physiology instructional videos, featu
 
 ## 🔧 Installation Steps
 
-### 1. Installation & Performance Acceleration (Recommended via uv)
-
-This project supports **RTX 4090 GPU Hardware Acceleration**. Using `uv` automatically installs compatible CUDA packages, ensuring a 5x+ increase in generation speed.
+### 1. Install & Configure (Recommended via uv)
 
 ```powershell
-# Clone and enter the folder
-# Run sync to automatically configure the best environment for your GPU
 uv sync
 ```
 
 ### 2. Install FFmpeg (Required)
 
 ```powershell
-# Using Chocolatey (Recommended)
 choco install ffmpeg
-
-# Or download from the official site and add to PATH
-# https://ffmpeg.org/download.html
+# Or: https://ffmpeg.org/download.html
 ```
 
-### 3. Set API Keys (Optional)
+### 3. Install Coqui XTTS-v2 (Optional - for Voice Cloning)
 
-**Defaults to free Google Translate, no setup required!** 🎉
-
-If you want to use professional AI translation (Paid), choose one of the following:
-
-**Option A: Environment Variables**
 ```powershell
-$env:OPENAI_API_KEY="sk-your-key-here"
-```
-
-**Option B: Modify config.py**
-```python
-TRANSLATION_CONFIG = {
-    "api_provider": "openai",  # Change to openai or anthropic
-}
-OPENAI_API_KEY = "sk-your-key-here"
+uv pip install "TTS>=0.22.0"
 ```
 
 ## ✅ Verify Installation
@@ -61,57 +41,141 @@ OPENAI_API_KEY = "sk-your-key-here"
 uv run python test_setup.py
 ```
 
-This checks all necessary dependencies and configurations.
-
 ## 🎬 Getting Started
 
 ### One-Click Fully Automatic Mode (Highly Recommended)
 
-The latest `main.py` integrates all the automation magic! It handles translation, TTS generation, **Dynamic Audio Alignment (`align_audio`)** to ensure precision, and final merging. It also **automatically clears thousands of temporary audio files** to save space.
-
-**Standard Automatic Processing (EdgeTTS):**
+**Standard Processing (Edge TTS):**
 ```powershell
 uv run python main.py --video "video\Neurophysiology-1.mp4"
 ```
 
-**Voice Cloning (XTTS) Processing:**
-Provide a reference audio file.
+**With Subtitle Refinement (remove fillers + merge short segments):**
 ```powershell
-uv run python main.py --video "video\Neurophysiology-1.mp4" --ref-audio "teacher_voice.wav" --xtts
+uv run python main.py --video "video\Neurophysiology-1.mp4" --refine
 ```
 
-**Batch Processing a Folder:**
+**Full Premium Pipeline: XTTS Voice Cloning + Subtitle Refinement:**
 ```powershell
-uv run python main.py --batch
+# Step 1: Extract reference audio
+uv run python scripts/extract_ref_audio.py `
+    --video "video\Neurophysiology-1.mp4" --start 30 --duration 15
+
+# Step 2: Full high-quality pipeline
+uv run python main.py --video "video\Neurophysiology-1.mp4" `
+    --xtts --ref-audio "output\ref_audio\Neurophysiology-1_ref.wav" `
+    --refine
+```
+
+**Batch Processing:**
+```powershell
+uv run python main.py --batch --refine
 ```
 
 ### Two-Stage Workflow with Manual Correction (Advanced)
 
-If you want to polish transcribed Chinese subtitles before translation and dubbing:
-
-1.  **Stage 1 - Extract Initial Subtitles**:
+1.  **Stage 1 - Extract Initial Chinese Subtitles**:
     ```powershell
     uv run python main.py --video "video\Neurophysiology-1.mp4" --subtitle-only
     ```
-2.  **Manual Correction**: Edit `output\subtitles\Neurophysiology-1_zh.srt`. Once done, rename it to `Neurophysiology-1_zh_corrected.srt`.
-3.  **Stage 2 - Automatic Continuation**: Run the standard command; the program will **automatically detect** your `_corrected` file and skip directly to translation and XTTS.
+2.  **Manual Correction**: Edit `output\subtitles\Neurophysiology-1_zh.srt`. Save as `Neurophysiology-1_zh_corrected.srt`.
+3.  **Stage 2 - Automatic Continuation with Refinement + XTTS**:
     ```powershell
-    uv run python main.py --video "video\Neurophysiology-1.mp4" --ref-audio "teacher_voice.wav" --xtts
+    uv run python main.py --video "video\Neurophysiology-1.mp4" `
+        --xtts --ref-audio "output\ref_audio\Neurophysiology-1_ref.wav" `
+        --refine
     ```
 
-## 📊 Processing Workflow Detailed
+### Modular Step-by-Step Execution
 
-1.  **Extract Subtitles** - AI extracts Chinese text.
-2.  **Translate Subtitles** - Optimized for 100+ medical terms.
-3.  **Generate Speech** - TTS or Voice Cloning.
-4.  **Precise Alignment** - Time-stretching audio to match visuals.
-5.  **Synthesis & Cleanup** - FFmpeg merging and clearing temporary assets.
+**1. Translate Chinese subtitles:**
+```powershell
+uv run python scripts/translate_subs.py
+```
+
+**2. 🆕 Three-stage English subtitle refinement:**
+```powershell
+# Full refinement (rule cleanup + AI polish + merge shorts)
+uv run python scripts/refine_en_srt.py `
+    --file "output\subtitles\Neurophysiology-1_en.srt"
+
+# Rule cleanup + merge only (fastest, no AI)
+uv run python scripts/refine_en_srt.py `
+    --file "output\subtitles\Neurophysiology-1_en.srt" --no-ai
+```
+
+**3. Extract reference audio (XTTS only):**
+```powershell
+uv run python scripts/extract_ref_audio.py `
+    --video "video\Neurophysiology-1.mp4" --start 30 --duration 15
+```
+
+**4. Generate TTS audio (Edge TTS or XTTS):**
+```powershell
+# Edge TTS (free)
+uv run python scripts/generate_tts.py `
+    --srt "output\subtitles\Neurophysiology-1_en.srt"
+
+# XTTS Voice Cloning (use refined subtitles for best results)
+uv run python scripts/generate_tts.py `
+    --srt "output\subtitles\Neurophysiology-1_en_refined.srt" `
+    --xtts --ref "output\ref_audio\Neurophysiology-1_ref.wav"
+```
+
+**5. Audio alignment & synthesis:**
+```powershell
+uv run python scripts/align_audio.py
+```
+
+## 📊 Processing Workflow
+
+1.  **Extract Subtitles** (~2-5 mins) - ASR extracts Chinese text.
+2.  **Translate Subtitles** (~1-3 mins) - Google Translate, 100+ medical terms optimized.
+3.  **🆕 Subtitle Refinement** (`--refine`, ~1-2 mins):
+    -   Rule cleaning: Remove Then/Just/So sentence starters
+    -   AI polishing: Translate residual Chinese, fix awkward phrasing
+    -   Merge segments: ~4,676 → ~1,295 entries (3.6x compression)
+4.  **Generate Speech** (~5-10 mins) - Edge TTS or XTTS voice cloning.
+5.  **Precise Alignment** - Dynamically time-stretch audio to match video.
+6.  **Synthesis & Cleanup** (~2-5 mins) - FFmpeg merging, auto-delete temp files.
+
+**Total time**: ~10-20 mins per 1-hour video | **Cost**: **Free!** 🎉
+
+## ⚙️ Key Configuration
+
+### Permanently enable subtitle refinement
+
+```python
+# config.py
+EN_REFINE_CONFIG = {
+    "enabled": True,     # auto-refine every run
+    "ai_enabled": False, # False = rule cleanup + merge only (fastest)
+}
+```
+
+### Permanently enable XTTS voice cloning
+
+```python
+# config.py
+TTS_CONFIG = {
+    "use_xtts": True,
+    "ref_audio_path": "output/ref_audio/your_ref.wav",
+}
+```
 
 ## 🐛 Troubleshooting
 
 -   **"CUDA out of memory"**: Switch to a smaller Whisper model size in `config.py`.
 -   **"FFmpeg not found"**: Ensure FFmpeg is in your system PATH.
--   **XTTS not working**: Ensure `uv sync` completed and you have an NVIDIA GPU.
+-   **XTTS not working**: Ensure `uv pip install "TTS>=0.22.0"` completed. First run downloads ~1.8GB model.
+-   **Too many filler words or short fragments**: Add `--refine` flag or use `scripts/refine_en_srt.py`.
+
+## 💡 Tips
+
+1.  **Completely Free**: Default config uses Google Translate — no cost.
+2.  **Best Quality**: Combine `--refine --xtts` for clean subtitles + faithful voice.
+3.  **Test Small First**: Try a 1-2 min clip before processing full lectures.
+4.  **Resume Anytime**: Existing subtitle/audio files are auto-skipped; interrupt and retry safely.
 
 ---
 **Updated**: February 22, 2026

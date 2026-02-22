@@ -13,6 +13,7 @@ from pathlib import Path
 # 確保能跨模組導入 scripts 底下的腳本
 sys.path.append(str(Path(__file__).parent))
 from scripts.align_audio import align_audio
+from scripts.refine_en_srt import refine_srt
 
 # 導入模組
 from modules.asr import ASRProcessor
@@ -203,6 +204,27 @@ class VideoTranslationPipeline:
                     only_flagged=config.EN_PROOFREAD_CONFIG.get("only_flagged", False),
                 )
             
+            # 步驟 2.5: 英文字幕三段式精修（規則清理 → AI 潤色 → 短句合併）
+            if config.EN_REFINE_CONFIG.get("enabled", False):
+                logger.info("【步驟 2.5/4】英文字幕精修（去贅詞 + AI 潤色 + 短句合併）...")
+                cfg = config.EN_REFINE_CONFIG
+                en_srt_path = refine_srt(
+                    srt_path=en_srt_path,
+                    suffix=cfg.get("suffix", "_refined"),
+                    overwrite=cfg.get("overwrite_original", False),
+                    no_ai=not cfg.get("ai_enabled", True),
+                    ai_all=cfg.get("ai_all", False),
+                    batch_size=cfg.get("batch_size", 8),
+                    timeout=cfg.get("timeout", 180),
+                    model=cfg.get("model") or None,
+                    command=cfg.get("command") or None,
+                    command_args=cfg.get("command_args"),
+                    gap_ms=cfg.get("merge_gap_ms", 300),
+                    min_words=cfg.get("merge_min_words", 7),
+                    max_words=cfg.get("merge_max_words", 18),
+                )
+                logger.info(f"✓ 精修後字幕: {Path(en_srt_path).name}\n")
+
             # 步驟 3: TTS - 文字轉語音 (斷點續傳)
             logger.info("【步驟 3/4】生成英文語音 (TTS)...")
             audio_segments = self.tts.generate_audio_from_srt(
@@ -329,6 +351,9 @@ def main():
     gemini_group = parser.add_mutually_exclusive_group()
     gemini_group.add_argument("--gemini", action="store_true", help="啟用 Gemini 校稿")
     gemini_group.add_argument("--no-gemini", action="store_true", help="停用 Gemini 校稿")
+    refine_group = parser.add_mutually_exclusive_group()
+    refine_group.add_argument("--refine", action="store_true", help="啟用英文字幕三段式精修（去贅詞+AI潤色+短句合併）")
+    refine_group.add_argument("--no-refine", action="store_true", help="停用英文字幕精修")
     
     args = parser.parse_args()
 
@@ -337,6 +362,11 @@ def main():
     elif args.no_gemini:
         config.GEMINI_CONFIG["enabled"] = False
     
+    if args.refine:
+        config.EN_REFINE_CONFIG["enabled"] = True
+    elif args.no_refine:
+        config.EN_REFINE_CONFIG["enabled"] = False
+
     if args.xtts:
         config.TTS_CONFIG["use_xtts"] = True
     
