@@ -88,6 +88,42 @@ def zh_char_count(text: str) -> int:
     return len(CJK.findall(text))
 
 
+def dedup_merged_text(text: str) -> str:
+    """
+    清理合併後因口語回頭重複造成的字串冗餘。
+    如「下降下降」→「下降」、「是在是在」→「是在」。
+    保留強調性重複：「非常非常」「很多很多」「很快很快」。
+    採用純字串掃描避免正則回溯爆炸。
+    """
+    KEEP = {"非常", "很多", "一直", "一點", "很快", "很好", "很大", "很小", "很長", "很高"}
+
+    # 從長到短掃描重複片語（只掃純中文字）
+    for n in (5, 4, 3, 2):
+        i = 0
+        result = []
+        while i < len(text):
+            chunk = text[i:i+n]
+            # 確認是純中文且有足夠長度
+            if (len(chunk) == n
+                    and all('\u4e00' <= c <= '\u9fff' for c in chunk)
+                    and text[i+n:i+2*n] == chunk
+                    and chunk not in KEEP):
+                # 跳過第二次出現（去重）
+                result.append(chunk)
+                i += 2 * n
+            else:
+                result.append(text[i])
+                i += 1
+        text = "".join(result)
+
+    return text.strip()
+
+
+
+
+
+
+
 def merge_blocks(
     blocks: list[dict],
     gap_ms: int = 400,
@@ -95,7 +131,7 @@ def merge_blocks(
     max_chars: int = 35,
 ) -> list[dict]:
     """
-    將相鄰且過短的中文字幕合併為語意較完整的條目。
+    將相鄰且過短的中文字幕合併為語意較完整的條目，並清理重複字片。
     """
     if not blocks:
         return []
@@ -105,12 +141,6 @@ def merge_blocks(
     group_texts = [blocks[0]["text"]]
 
     for curr in blocks[1:]:
-        prev_end = group_start["end_ms"]  # 視窗最後 end
-        # 取目前 group 最後一個 block 的 end
-        if merged:
-            # 重新計算 prev_end 為 group 中最後一條的 end
-            pass
-        # 實際上 group_start 的 end 在每次合併後都要更新
         gap = curr["start_ms"] - group_start["end_ms"]
         current_text = "".join(group_texts)
         current_char_count = zh_char_count(current_text)
@@ -118,35 +148,30 @@ def merge_blocks(
 
         # 判斷是否繼續合併
         can_merge = (
-            gap <= gap_ms                    # 間隔夠小
-            and current_char_count < min_chars  # 目前太短
-            and new_total_chars <= max_chars    # 合併後不超過上限
+            gap <= gap_ms                        # 間隔夠小
+            and current_char_count < min_chars   # 目前太短
+            and new_total_chars <= max_chars      # 合併後不超過上限
             and not SENTENCE_END.search(current_text)  # 上一段不是句尾
         )
 
         if can_merge:
-            # 繼續堆疊，延長 end
             group_texts.append(curr["text"])
             group_start["end"] = curr["end"]
             group_start["end_ms"] = curr["end_ms"]
         else:
-            # 輸出目前 group
-            merged_text = "".join(group_texts)
-            merged.append({
-                **group_start,
-                "text": merged_text,
-            })
-            # 以 curr 開新 group
+            merged_text = dedup_merged_text("".join(group_texts))
+            merged.append({**group_start, "text": merged_text})
             group_start = curr.copy()
             group_texts = [curr["text"]]
 
     # 最後一組
     merged.append({
         **group_start,
-        "text": "".join(group_texts),
+        "text": dedup_merged_text("".join(group_texts)),
     })
 
     return merged
+
 
 
 # ─── 主程式 ──────────────────────────────────────────────────────────────────
@@ -183,6 +208,9 @@ def merge_zh_srt(
 
     orig_count = len(blocks)
     merged = merge_blocks(blocks, gap_ms=gap_ms, min_chars=min_chars, max_chars=max_chars)
+    # 對所有字幕（含未合併的）再做一輪全局去重，清除原始 ASR 本身的口語重複
+    merged = [{**b, "text": dedup_merged_text(b["text"])} for b in merged]
+
     new_count = len(merged)
 
     logger.info(
