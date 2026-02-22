@@ -14,6 +14,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 from scripts.align_audio import align_audio
 from scripts.refine_en_srt import refine_srt
+from scripts.merge_zh_srt import merge_zh_srt
 
 # 導入模組
 from modules.asr import ASRProcessor
@@ -153,7 +154,26 @@ class VideoTranslationPipeline:
                 logger.info(f"地點: {proofread_srt_path or cleaned_srt_path or zh_srt_path}")
                 logger.info(f"{'='*60}\n")
                 return str(proofread_srt_path or cleaned_srt_path or zh_srt_path)
-            
+
+            # 步驟 1.5: 中文短句合併（翻譯前最佳化）
+            merge_zh_enabled = (
+                getattr(self, '_merge_zh', None)
+                if getattr(self, '_merge_zh', None) is not None
+                else config.ZH_MERGE_CONFIG.get("enabled", False)
+            )
+            if merge_zh_enabled:
+                logger.info("【步驟 1.5/4】中文短句合併（翻譯前）...")
+                merged_zh_path = merge_zh_srt(
+                    input_path=Path(source_srt_path),
+                    suffix=config.ZH_MERGE_CONFIG.get("suffix", "_zh_merged"),
+                    overwrite=config.ZH_MERGE_CONFIG.get("overwrite_original", False),
+                    gap_ms=config.ZH_MERGE_CONFIG.get("merge_gap_ms", 400),
+                    min_chars=config.ZH_MERGE_CONFIG.get("merge_min_chars", 8),
+                    max_chars=config.ZH_MERGE_CONFIG.get("merge_max_chars", 35),
+                )
+                source_srt_path = str(merged_zh_path)
+                logger.info(f"✓ 中文合併完成: {merged_zh_path.name}\n")
+
             # 步驟 2: 翻譯 (斷點續傳)
             # 檢查是否已存在各種可能的英文字幕檔名 (標準、手動校正後產生的)
             potential_en_paths = [
@@ -354,6 +374,9 @@ def main():
     refine_group = parser.add_mutually_exclusive_group()
     refine_group.add_argument("--refine", action="store_true", help="啟用英文字幕三段式精修（去贅詞+AI潤色+短句合併）")
     refine_group.add_argument("--no-refine", action="store_true", help="停用英文字幕精修")
+    merge_zh_group = parser.add_mutually_exclusive_group()
+    merge_zh_group.add_argument("--merge-zh", action="store_true", help="啟用翻譯前中文短句合併，改善翻譯品質")
+    merge_zh_group.add_argument("--no-merge-zh", action="store_true", help="停用中文短句合併")
     
     args = parser.parse_args()
 
@@ -366,6 +389,11 @@ def main():
         config.EN_REFINE_CONFIG["enabled"] = True
     elif args.no_refine:
         config.EN_REFINE_CONFIG["enabled"] = False
+
+    if args.merge_zh:
+        config.ZH_MERGE_CONFIG["enabled"] = True
+    elif args.no_merge_zh:
+        config.ZH_MERGE_CONFIG["enabled"] = False
 
     if args.xtts:
         config.TTS_CONFIG["use_xtts"] = True

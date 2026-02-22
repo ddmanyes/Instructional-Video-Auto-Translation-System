@@ -53,6 +53,21 @@ CLEANER_CONFIG = {
     },
 }
 
+# 翻譯前中文短句合併設定
+# 執行時機：ASR/手動校正 → 【合併短句】→ 翻譯
+# 啟用方式：設 enabled=True，或執行時加 --merge-zh 旗標
+ZH_MERGE_CONFIG = {
+    "enabled": False,           # 是否啟用（可由 --merge-zh / --no-merge-zh 覆蓋）
+    "suffix": "_zh_merged",     # 輸出後綴（不覆蓋原檔）
+    "overwrite_original": False,# True = 直接覆蓋輸入檔
+
+    # 合併參數
+    "merge_gap_ms": 400,        # 相鄰字幕容忍間隔（毫秒）
+    "merge_min_chars": 8,       # 合併目標最低中文字元數（< 此值才合併）
+    "merge_max_chars": 35,      # 合併後中文字元數上限（防止過長）
+}
+
+
 # Gemini CLI 校稿設定
 GEMINI_CONFIG = {
     "enabled": False,
