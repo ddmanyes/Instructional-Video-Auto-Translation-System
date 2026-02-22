@@ -258,12 +258,12 @@ def _call_gemini(
     command_args: list[str] | None,
     model: str | None,
 ) -> list[str]:
-    base_cmd = [command or "pwsh"]
+    base_cmd = [command or "npx"]
     if command_args:
         base_cmd.extend(command_args)
-    elif command in (None, "pwsh", "powershell"):
-        # fallback: 直接呼叫 gemini
-        base_cmd = ["gemini"]
+    elif not command:
+        # fallback: default cross-platform npx command
+        base_cmd.extend(["-y", "@google/generative-ai-cli"])
 
     outputs: list[str] = []
     for i in range(0, len(lines), batch_size):

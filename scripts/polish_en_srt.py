@@ -207,12 +207,12 @@ def _call_gemini(
     """呼叫 Gemini CLI 批次處理，回傳與輸入等長的修訂後字串列表"""
     all_outputs = []
 
-    gemini_cmd = [command or "pwsh"]
+    gemini_cmd = [command or "npx"]
     if command_args:
         gemini_cmd.extend(command_args)
-    else:
-        # 嘗試直接呼叫 gemini
-        gemini_cmd = [command or "gemini"]
+    elif not command:
+        # fallback: default cross-platform npx command
+        gemini_cmd.extend(["-y", "@google/generative-ai-cli"])
 
     for i in range(0, len(lines), batch_size):
         batch = lines[i : i + batch_size]
@@ -376,7 +376,7 @@ def main():
     if not args.no_ai:
         logger.info("── 第二階段：Gemini AI 潤色 ──")
         # 讀取 config 的 Gemini 設定
-        cmd = config.EN_PROOFREAD_CONFIG.get("command", "pwsh")
+        cmd = config.EN_PROOFREAD_CONFIG.get("command", "npx")
         cmd_args = config.EN_PROOFREAD_CONFIG.get("command_args", [])
         model = args.model or config.EN_PROOFREAD_CONFIG.get("model", "") or None
 

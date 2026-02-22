@@ -56,10 +56,10 @@ CLEANER_CONFIG = {
 # Gemini CLI 校稿設定
 GEMINI_CONFIG = {
     "enabled": False,
-    "command": "pwsh",
+    "command": "npx",
     "command_args": [
-        "-File",
-        r"C:\Users\User\AppData\Roaming\npm\gemini.ps1",
+        "-y",
+        "@google/generative-ai-cli",
     ],
     "model": "",
     "batch_size": 8,
@@ -83,10 +83,10 @@ EN_PROOFREAD_PROMPT = (
 
 EN_PROOFREAD_CONFIG = {
     "enabled": False,
-    "command": "pwsh",
+    "command": "npx",
     "command_args": [
-        "-File",
-        r"C:\Users\User\AppData\Roaming\npm\gemini.ps1",
+        "-y",
+        "@google/generative-ai-cli",
     ],
     "model": "",
     "batch_size": 8,
@@ -108,10 +108,10 @@ EN_REFINE_CONFIG = {
     # ── AI 潤色選項 ───────────────────────────────────────────────
     "ai_enabled": False,         # False = 只做規則清理+合併，不呼叫 AI
     "ai_all": False,            # True = AI 處理所有行；False = 只修中文殘留行
-    "command": "pwsh",
+    "command": "npx",
     "command_args": [
-        "-File",
-        r"C:\Users\User\AppData\Roaming\npm\gemini.ps1",
+        "-y",
+        "@google/generative-ai-cli",
     ],
     "model": "",                # 留空使用 Gemini CLI 預設模型
     "batch_size": 8,            # AI 每批次處理條數
