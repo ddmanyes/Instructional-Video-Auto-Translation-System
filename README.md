@@ -1,5 +1,7 @@
 # 教學影片自動翻譯系統 🎥→🌍
 
+[English Version (英文版)](README_EN.md) | [Quick Start (英文快速入門)](QUICKSTART_EN.md)
+
 這是一個全自動的影片翻譯系統，專為生理學教學影片設計，可將中文教學影片轉換為高品質的英文版本。
 
 ## 🌟 核心功能
