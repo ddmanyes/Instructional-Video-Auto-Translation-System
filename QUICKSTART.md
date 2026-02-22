@@ -9,24 +9,24 @@
 ## 📋 前置需求
 
 - Windows 10/11
-- Python 3.8 或更高版本
-- 至少 8GB RAM（建議 16GB）
+- Python 3.11+
+- **NVIDIA GPU (推薦 RTX 30/40 系列)**
+- 至少 16GB RAM (XTTS 運算建議)
 - 硬碟空間：至少 20GB（用於模型和輸出檔案）
 
 ## 🔧 安裝步驟
 
-### 1. 安裝 Python 依賴
+### 1. 安裝與效能加速 (推薦使用 uv)
+
+本專案支援 **RTX 4090 GPU 硬體加速**。使用 `uv` 能夠自動安裝相容的 CUDA 套件，確保生成速度提升 5 倍以上。
 
 ```powershell
-# 建議使用虛擬環境
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-
-# 安裝依賴（包含免費的 Google Translate）
-pip install -r requirements.txt
+# 克隆後進入資料夾
+# 執行 sync 會自動根據你的顯示卡配置最佳環境
+uv sync
 ```
 
-### 2. 安裝 FFmpeg
+### 2. 安裝 FFmpeg (必需)
 
 ```powershell
 # 使用 Chocolatey (推薦)
@@ -111,7 +111,7 @@ uv run python main.py --video "video\Neurophysiology-1.mp4" --subtitle-only
 2. **手動校正存檔**：打開產出的 `output\subtitles\Neurophysiology-1_zh.srt` 進行編輯修改，完成後務必重新命名為 `Neurophysiology-1_zh_corrected.srt`。
 3. **第二階段 - 續傳自動生成與後製**：再次執行一般的指令，程式會**自動優先偵測**你的 `_corrected` 檔，並直接跳過 AI 辨識接續完成最好的翻譯、XTTS與對齊合成：
 ```powershell
-uv run python main.py --video "video\Neurophysiology-1.mp4" --ref-audio "teacher_voice.wav"
+uv run python main.py --video "video\Neurophysiology-1.mp4" --ref-audio "teacher_voice.wav" --xtts
 ```
 
 ### 模組化命令行模式 (底層除錯分開執行)

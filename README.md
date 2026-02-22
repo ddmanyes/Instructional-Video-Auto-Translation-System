@@ -8,7 +8,8 @@
 2. **智能翻譯** - 預設使用 Google Translate（免費）+ **生理醫學術語優化**
 3. **語音生成與克隆** - 支援 Edge TTS (預設版) 與 **Coqui XTTS-v2** 聲音克隆 (保留原講者特色)
 4. **精確對齊與合成** - 使用 `align_audio.py` 自動計算時長以 `FFmpeg` 無損伸縮，徹底解決影音不同步
-5. **模組化腳本管道** - 可單獨呼叫翻譯、提取參考音訊、TTS生成、音軌對齊等流程
+5. **GPU 加速與版本鎖定** - 深度整合 **NVIDIA RTX 4090 (CUDA 12.1)**，速度提升 5 倍；手動鎖定 `transformers` 與 `torch` 版本以確保系統極度穩定
+6. **模組化腳本管道** - 可單獨呼叫翻譯、提取參考音訊、TTS生成、音軌對齊等流程
 
 ## 🎓 專為生理醫學設計
 
@@ -59,17 +60,20 @@
 
 ### 方法 A：使用 UV（推薦 - 穩定且現代）
 
-**系統需求：** Python 3.11+
+**系統需求：**
+- **Python**: 3.11+
+- **GPU (推薦)**: NVIDIA GPU (RTX 30系/40系) 並安裝 CUDA 12.1+
+- **Memory**: 16GB+ RAM (XTTS 運算建議)
 
 ```powershell
-# 確保環境與依賴對齊
+# 1. 確保環境與效能依賴對齊 (會自動根據 pyproject.toml 安裝 CUDA 加速版)
 uv sync
 
-# 批次處理所有影片
-uv run python main.py --batch
+# 2. 生成聲音克隆影片 (極速 GPU 模式)
+uv run python main.py --video "video/example.mp4" --ref-audio "teacher.wav" --xtts
 
-# 或使用互動式腳本
-uv run .\run_uv.ps1
+# 3. 批次處理所有影片
+uv run python main.py --batch
 ```
 
 詳見 [UV_GUIDE.md](UV_GUIDE.md) 完整說明。

@@ -33,12 +33,14 @@ dependencies = [
     "trainer>=0.0.36",
     "coqpit>=0.0.17",
     "transformers>=4.30.0,<4.40.0",
+    "torch>=2.0.0,<2.6.0",
+    "torchaudio>=2.0.0,<2.6.0",
 ]
 
 [project.optional-dependencies]
 gpu = [
-    "torch>=2.0.0",
-    "torchaudio>=2.0.0",
+    "torch>=2.0.0,<2.6.0",
+    "torchaudio>=2.0.0,<2.6.0",
 ]
 
 dev = [
@@ -66,3 +68,12 @@ target-version = ['py38', 'py39', 'py310', 'py311']
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu121" }
+torchaudio = { index = "pytorch-cu121" }
